@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useAlert } from '@/template';
@@ -7,11 +7,18 @@ import { GradientCard } from '@/components/ui/GradientCard';
 import { Button } from '@/components/ui/Button';
 import { colors, typography, spacing, borderRadius } from '@/constants/theme';
 
+interface SettingOption {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}
+
 export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const { showAlert } = useAlert();
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     showAlert('Confirmar', 'Deseja realmente sair?', [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -25,44 +32,44 @@ export default function SettingsScreen() {
         },
       },
     ]);
-  };
+  }, [logout, showAlert]);
 
-  const settingsOptions = [
+  const settingsOptions: SettingOption[] = [
     {
       icon: 'person-outline',
       title: 'Perfil',
       subtitle: 'Gerencie suas informações pessoais',
-      onPress: () => showAlert('Em breve', 'Funcionalidade em desenvolvimento'),
+      onPress: useCallback(() => showAlert('Em breve', 'Funcionalidade em desenvolvimento'), [showAlert]),
     },
     {
       icon: 'notifications-outline',
       title: 'Notificações',
       subtitle: 'Configure alertas e notificações',
-      onPress: () => showAlert('Em breve', 'Funcionalidade em desenvolvimento'),
+      onPress: useCallback(() => showAlert('Em breve', 'Funcionalidade em desenvolvimento'), [showAlert]),
     },
     {
       icon: 'card-outline',
       title: 'Pagamentos',
       subtitle: 'Gerencie métodos de pagamento',
-      onPress: () => showAlert('Em breve', 'Funcionalidade em desenvolvimento'),
+      onPress: useCallback(() => showAlert('Em breve', 'Funcionalidade em desenvolvimento'), [showAlert]),
     },
     {
       icon: 'shield-checkmark-outline',
       title: 'Segurança',
       subtitle: 'Configurações de segurança e privacidade',
-      onPress: () => showAlert('Em breve', 'Funcionalidade em desenvolvimento'),
+      onPress: useCallback(() => showAlert('Em breve', 'Funcionalidade em desenvolvimento'), [showAlert]),
     },
     {
       icon: 'help-circle-outline',
       title: 'Ajuda e Suporte',
       subtitle: 'Central de ajuda e documentação',
-      onPress: () => showAlert('Em breve', 'Funcionalidade em desenvolvimento'),
+      onPress: useCallback(() => showAlert('Em breve', 'Funcionalidade em desenvolvimento'), [showAlert]),
     },
     {
       icon: 'information-circle-outline',
       title: 'Sobre',
       subtitle: 'Versão 1.0.0 - Plataforma Apogeu',
-      onPress: () => showAlert('Apogeu', 'Plataforma de Automação de Marketing\nVersão 1.0.0'),
+      onPress: useCallback(() => showAlert('Apogeu', 'Plataforma de Automação de Marketing\nVersão 1.0.0'), [showAlert]),
     },
   ];
 
@@ -96,7 +103,7 @@ export default function SettingsScreen() {
               onPress={option.onPress}
             >
               <View style={styles.settingIcon}>
-                <Ionicons name={option.icon as any} size={24} color={colors.primary.blue} />
+                <Ionicons name={option.icon} size={24} color={colors.primary.blue} />
               </View>
               <View style={styles.settingContent}>
                 <Text style={styles.settingTitle}>{option.title}</Text>
@@ -219,3 +226,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
 });
+
