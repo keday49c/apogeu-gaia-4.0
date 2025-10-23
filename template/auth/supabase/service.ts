@@ -1,4 +1,4 @@
-import { AuthUser, SendOTPOptions, SignUpResult, AuthResult, LogoutResult, AuthError } from '../types';
+import { AuthUser, SendOTPOptions, SignUpResult, AuthResult, LogoutResult } from '../types';
 import { safeSupabaseOperation, getSharedSupabaseClient } from '../../core/client';
 import { configManager } from '../../core/config';
 import { Platform } from 'react-native';
@@ -41,7 +41,6 @@ const withTimeout = async <T>(
 
 const isAuthError = (error: any): boolean => {
   if (error instanceof Error && error.message?.includes('timeout')) return false;
-  // Supabase auth errors often have a status code or specific messages
   return error.status === 401 || 
          error.status === 403 || 
          error.message?.includes('invalid_token') ||
@@ -72,12 +71,10 @@ export const getLastVisibilityChange = (): number => lastVisibilityChange;
 
 // Enhanced event filtering to prevent deadlock
 export const shouldIgnoreAuthEvent = (event: string): boolean => {
-  // Ignore USER_UPDATED events during updateUser operation to prevent deadlock
   if (event === 'USER_UPDATED' && isUpdatingUser) {
     return true;
   }
   
-  // Ignore visibility-triggered events for SIGNED_IN to avoid duplicate handling
   if (isVisibilityTriggeredAuthEvent(event)) {
     return true;
   }
@@ -93,14 +90,12 @@ const mapSupabaseUserToAuthUser = (user: User, profile?: any): AuthUser => {
     username: username,
     created_at: user.created_at,
     updated_at: user.updated_at || user.created_at,
-    // Add other profile fields if necessary
     ...(profile || {}),
   };
 };
 
 export class AuthService {
   constructor() {
-    // Initialize visibility monitoring
     setupVisibilityMonitoring();
   }
 
@@ -110,64 +105,67 @@ export class AuthService {
 
   async getCurrentUser(): Promise<AuthUser | null> {
     try {
-      const { data: { user: supabaseUser }, error: getUserError } = await withTimeout(
-        this.supabase.auth.getUser(),
-        TIMEOUT_CONFIG.DATA_QUERIES,
-        'GetUser'
-      );
+      const { data: getUserData, error: getUserError } = await safeSupabaseOperation(async (client) => {
+        return await withTimeout(
+          client.auth.getUser(),
+          TIMEOUT_CONFIG.DATA_QUERIES,
+          'GetUser'
+        );
+      });
 
-      if (getUserError) {
-        console.error('[Template:AuthService] Error getting user from Supabase:', getUserError.message);
+      if (getUserError || !getUserData?.user) {
+        console.error('[Template:AuthService] Error getting user from Supabase or user not found:', getUserError?.message || 'No user data');
         return null;
       }
-      if (!supabaseUser) {
-        return null;
-      }
+      const supabaseUser = getUserData.user;
 
       const authConfig = configManager.getModuleConfig('auth');
       const profileTableName = authConfig?.profileTableName || 'user_profiles';
 
       try {
-        const { data: profile, error: profileError } = await withTimeout(
-          this.supabase
-            .from(profileTableName)
-            .select('*')
-            .eq('id', supabaseUser.id)
-            .single(),
-          TIMEOUT_CONFIG.DATA_QUERIES,
-          'ProfileQuery'
-        );
+        const { data: profileData, error: profileError } = await safeSupabaseOperation(async (client) => {
+          return await withTimeout(
+            client
+              .from(profileTableName)
+              .select('*')
+              .eq('id', supabaseUser.id)
+              .single(),
+            TIMEOUT_CONFIG.DATA_QUERIES,
+            'ProfileQuery'
+          );
+        });
 
         if (profileError) {
           console.warn(`[Template:AuthService] Profile query failed for user ${supabaseUser.id}:`, profileError.message);
-          // Handle specific profile errors or use fallback
-          if (profileError.code === 'PGRST116') {
+          if (profileError.message.includes('PGRST116')) {
             console.warn(`[Template:AuthService] Profile table '${profileTableName}' not found. Using user data only.`);
-          } else if (profileError.code === 'PGRST301') {
+          } else if (profileError.message.includes('PGRST301')) {
             console.warn(`[Template:AuthService] User profile not found in '${profileTableName}'. Using user data only.`);
           }
           return mapSupabaseUserToAuthUser(supabaseUser);
         }
         
-        return mapSupabaseUserToAuthUser(supabaseUser, profile);
+        return mapSupabaseUserToAuthUser(supabaseUser, profileData);
 
-      } catch (profileCatchError) {
+      } catch (profileCatchError: any) {
         console.error(`[Template:AuthService] Unexpected error during profile fetch for user ${supabaseUser.id}:`, profileCatchError);
         return mapSupabaseUserToAuthUser(supabaseUser);
       }
 
     } catch (error: any) {
       console.error('[Template:AuthService] Error in getCurrentUser:', error);
-      // If it's a network/timeout error, try to get session as a fallback
       if (error.message?.includes('timeout') || isAuthError(error)) {
         try {
-          const { data: { session }, error: sessionError } = await this.supabase.auth.getSession();
+          const { data: sessionData, error: sessionError } = await safeSupabaseOperation(async (client) => {
+            return client.auth.getSession();
+          });
+          
           if (sessionError) {
             console.warn('[Template:AuthService] Fallback getSession also failed:', sessionError.message);
             return null;
           }
-          if (session?.user) {
-            return mapSupabaseUserToAuthUser(session.user);
+          if (sessionData?.session?.user) {
+            return mapSupabaseUserToAuthUser(sessionData.session.user);
           }
         } catch (sessionCatchError) {
           console.warn('[Template:AuthService] Session fallback unexpected error:', sessionCatchError);
@@ -214,9 +212,8 @@ export class AuthService {
 
   async verifyOTPAndLogin(email: string, otp: string, options?: { password?: string }): Promise<AuthResult> {
     try {
-      const { data, error } = await safeSupabaseOperation(async (client) => {
-        // Step 1: Verify OTP first
-        const verifyResult = await withTimeout(
+      const { data: verifyData, error: verifyError } = await safeSupabaseOperation(async (client) => {
+        return await withTimeout(
           client.auth.verifyOtp({
             email,
             token: otp,
@@ -225,29 +222,23 @@ export class AuthService {
           TIMEOUT_CONFIG.AUTH_OPERATIONS,
           'VerifyOTP'
         );
-
-        if (verifyResult.error) {
-          return { data: null, error: verifyResult.error };
-        }
-        return { data: verifyResult.data, error: null };
       });
 
-      if (error) {
-        if (error.message.includes('Database error saving new user')) {
+      if (verifyError) {
+        if (verifyError.message.includes('Database error saving new user')) {
           console.warn('[Template:AuthService] Database trigger missing, auth function available but user profile creation failed');
           console.warn('[Template:AuthService] Please refer to SDK documentation to set up user_profiles table and triggers');
         }
-        if (error.message.includes('timeout')) {
+        if (verifyError.message.includes('timeout')) {
           return { error: 'Verification timeout, please retry', user: null, errorType: 'timeout' };
         }
-        return { error: error.message, user: null, errorType: 'business' };
+        return { error: verifyError.message, user: null, errorType: 'business' };
       }
 
-      if (data?.user) {
-        // Step 2: Update user with password if provided (with deadlock prevention)
+      if (verifyData?.user) {
         if (options?.password) {
           try {
-            isUpdatingUser = true; // Set flag to prevent deadlock
+            isUpdatingUser = true;
             const { error: updateError } = await withTimeout(
               this.supabase.auth.updateUser({ password: options.password }),
               TIMEOUT_CONFIG.USER_UPDATE,
@@ -259,11 +250,10 @@ export class AuthService {
           } catch (updateError) {
             console.error('[Template:AuthService] Unexpected error during user update after OTP verification:', updateError);
           } finally {
-            // Clear flag after a delay to ensure all events are processed
             setTimeout(() => { isUpdatingUser = false; }, 2000);
           }
         }
-        const authUser = await this.getCurrentUser(); // Fetch the full AuthUser with profile
+        const authUser = await this.getCurrentUser();
         return { user: authUser, error: null };
       }
       return { user: null, error: 'User not found after OTP verification' };
@@ -278,7 +268,7 @@ export class AuthService {
 
   async signUpWithPassword(email: string, password: string, metadata?: Record<string, any>): Promise<SignUpResult> {
     try {
-      const { data, error } = await safeSupabaseOperation(async (client) => {
+      const { data: signUpData, error: signUpError } = await safeSupabaseOperation(async (client) => {
         return await withTimeout(
           client.auth.signUp({
             email,
@@ -292,15 +282,15 @@ export class AuthService {
         );
       });
 
-      if (error) {
-        if (error.message.includes('timeout')) {
+      if (signUpError) {
+        if (signUpError.message.includes('timeout')) {
           return { error: 'Network is slow, please retry', user: null, errorType: 'timeout' };
         }
-        return { error: error.message, user: null, errorType: 'business' };
+        return { error: signUpError.message, user: null, errorType: 'business' };
       }
 
-      if (data?.user) {
-        const authUser = await this.getCurrentUser(); // Fetch the full AuthUser with profile
+      if (signUpData?.user) {
+        const authUser = await this.getCurrentUser();
         return { user: authUser, error: null };
       }
       return { user: null, error: 'User not created during sign up' };
@@ -315,7 +305,7 @@ export class AuthService {
 
   async signInWithPassword(email: string, password: string): Promise<AuthResult> {
     try {
-      const { data, error } = await safeSupabaseOperation(async (client) => {
+      const { data: signInData, error: signInError } = await safeSupabaseOperation(async (client) => {
         return await withTimeout(
           client.auth.signInWithPassword({
             email,
@@ -326,15 +316,15 @@ export class AuthService {
         );
       });
 
-      if (error) {
-        if (error.message.includes('timeout')) {
+      if (signInError) {
+        if (signInError.message.includes('timeout')) {
           return { error: 'Network is slow, please retry', user: null, errorType: 'timeout' };
         }
-        return { error: error.message, user: null, errorType: 'business' };
+        return { error: signInError.message, user: null, errorType: 'business' };
       }
 
-      if (data?.user) {
-        const authUser = await this.getCurrentUser(); // Fetch the full AuthUser with profile
+      if (signInData?.user) {
+        const authUser = await this.getCurrentUser();
         return { user: authUser, error: null };
       }
       return { user: null, error: 'User not found during sign in' };
@@ -349,7 +339,7 @@ export class AuthService {
 
   async logout(): Promise<LogoutResult> {
     try {
-      const { error } = await safeSupabaseOperation(async (client) => {
+      const { error: logoutError } = await safeSupabaseOperation(async (client) => {
         return await withTimeout(
           client.auth.signOut(),
           TIMEOUT_CONFIG.AUTH_OPERATIONS,
@@ -357,11 +347,11 @@ export class AuthService {
         );
       });
 
-      if (error) {
-        if (error.message.includes('timeout')) {
+      if (logoutError) {
+        if (logoutError.message.includes('timeout')) {
           return { error: 'Network is slow, please retry', errorType: 'timeout' };
         }
-        return { error: error.message, errorType: 'business' };
+        return { error: logoutError.message, errorType: 'business' };
       }
       return {};
     } catch (error: any) {
@@ -375,13 +365,18 @@ export class AuthService {
 
   async refreshSession(): Promise<void> {
     try {
-      await withTimeout(
-        this.supabase.auth.refreshSession(),
-        TIMEOUT_CONFIG.SESSION_REFRESH,
-        'RefreshSession'
-      );
+      const { error: refreshError } = await safeSupabaseOperation(async (client) => {
+        return await withTimeout(
+          client.auth.refreshSession(),
+          TIMEOUT_CONFIG.SESSION_REFRESH,
+          'RefreshSession'
+        );
+      });
+      if (refreshError) {
+        console.warn('[Template:AuthService] Refresh session error:', refreshError.message);
+      }
     } catch (error) {
-      console.warn('[Template:AuthService] Refresh session error:', error);
+      console.warn('[Template:AuthService] Refresh session unexpected error:', error);
     }
   }
 
@@ -392,7 +387,7 @@ export class AuthService {
       }
 
       if (session?.user) {
-        const authUser = await this.getCurrentUser(); // Fetch the full AuthUser with profile
+        const authUser = await this.getCurrentUser();
         callback(authUser);
       } else {
         callback(null);
