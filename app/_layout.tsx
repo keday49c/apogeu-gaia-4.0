@@ -2,13 +2,19 @@ import { Stack } from 'expo-router';
 import React from 'react';
 import { AuthProvider, AlertProvider } from '@/template';
 import { CampaignProvider } from '@/contexts/CampaignContext';
+import { colors } from '@/constants/theme'; // Import colors for header styling
 
 export default function RootLayout() {
   return (
     <AlertProvider>
       <AuthProvider>
         <CampaignProvider>
-          <Stack screenOptions={{ headerShown: false }}>
+          <Stack
+            screenOptions={{
+              headerShown: false, // Default to no header, individual screens can override
+              contentStyle: { backgroundColor: colors.background.primary }, // Consistent background
+            }}
+          >
             <Stack.Screen name="index" />
             <Stack.Screen name="login" />
             <Stack.Screen name="(tabs)" />
@@ -16,11 +22,11 @@ export default function RootLayout() {
               name="campaign/[id]"
               options={{
                 headerShown: true,
-                headerTitle: 'Detalhes',
+                headerTitle: 'Detalhes da Campanha',
                 headerStyle: {
-                  backgroundColor: '#1A1F3A',
+                  backgroundColor: colors.background.secondary, // Use theme colors
                 },
-                headerTintColor: '#FFFFFF',
+                headerTintColor: colors.text.primary, // Use theme colors
                 headerBackTitle: 'Voltar',
               }}
             />
@@ -30,9 +36,9 @@ export default function RootLayout() {
                 headerShown: true,
                 headerTitle: 'Nova Campanha',
                 headerStyle: {
-                  backgroundColor: '#1A1F3A',
+                  backgroundColor: colors.background.secondary, // Use theme colors
                 },
-                headerTintColor: '#FFFFFF',
+                headerTintColor: colors.text.primary, // Use theme colors
                 headerBackTitle: 'Voltar',
               }}
             />
@@ -42,3 +48,4 @@ export default function RootLayout() {
     </AlertProvider>
   );
 }
+
