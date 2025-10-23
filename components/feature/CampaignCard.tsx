@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Campaign } from '@/services/campaignService';
@@ -12,27 +12,35 @@ interface CampaignCardProps {
   onStatusChange: (status: Campaign['status']) => void;
 }
 
+const statusColors: Record<Campaign['status'], string> = {
+  active: colors.status.active,
+  paused: colors.status.paused,
+  draft: colors.status.draft,
+  completed: colors.status.completed,
+};
+
+const statusIcons: Record<Campaign['status'], React.ComponentProps<typeof Ionicons>['name']> = {
+  active: 'play-circle',
+  paused: 'pause-circle',
+  draft: 'create',
+  completed: 'checkmark-circle',
+};
+
+const getNextStatus = (current: Campaign['status']): Campaign['status'] => {
+  if (current === 'draft') return 'active';
+  if (current === 'active') return 'paused';
+  if (current === 'paused') return 'active';
+  return 'active'; // Default or handle 'completed' status appropriately
+};
+
 export function CampaignCard({ campaign, onPress, onDelete, onStatusChange }: CampaignCardProps) {
-  const statusColors: Record<Campaign['status'], string> = {
-    active: colors.status.active,
-    paused: colors.status.paused,
-    draft: colors.status.draft,
-    completed: colors.status.completed,
-  };
+  const handleStatusToggle = useCallback(() => {
+    onStatusChange(getNextStatus(campaign.status));
+  }, [campaign.status, onStatusChange]);
 
-  const statusIcons: Record<Campaign['status'], any> = {
-    active: 'play-circle',
-    paused: 'pause-circle',
-    draft: 'create',
-    completed: 'checkmark-circle',
-  };
-
-  const getNextStatus = (current: Campaign['status']): Campaign['status'] => {
-    if (current === 'draft') return 'active';
-    if (current === 'active') return 'paused';
-    if (current === 'paused') return 'active';
-    return 'active';
-  };
+  const handleDeletePress = useCallback(() => {
+    onDelete();
+  }, [onDelete]);
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
@@ -42,7 +50,7 @@ export function CampaignCard({ campaign, onPress, onDelete, onStatusChange }: Ca
             <Text style={styles.title} numberOfLines={1}>
               {campaign.name}
             </Text>
-            <TouchableOpacity onPress={onDelete} style={styles.deleteButton}>
+            <TouchableOpacity onPress={handleDeletePress} style={styles.deleteButton}>
               <Ionicons name="trash-outline" size={20} color={colors.status.error} />
             </TouchableOpacity>
           </View>
@@ -83,7 +91,7 @@ export function CampaignCard({ campaign, onPress, onDelete, onStatusChange }: Ca
           </Text>
           {campaign.status !== 'completed' && (
             <TouchableOpacity
-              onPress={() => onStatusChange(getNextStatus(campaign.status))}
+              onPress={handleStatusToggle}
               style={styles.actionButton}
             >
               <Ionicons
@@ -182,3 +190,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
