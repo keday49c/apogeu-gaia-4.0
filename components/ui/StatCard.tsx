@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.caption,
-    color: colors.text.secondary,
+    color: colors.text.primary, // Changed to primary for better contrast on gradients
     marginBottom: spacing.xs,
   },
   value: {
@@ -46,7 +46,8 @@ const styles = StyleSheet.create({
   },
   change: {
     ...typography.caption,
-    color: colors.success,
+    color: colors.success, // Assuming success color has good contrast on various gradients
     marginTop: spacing.xs,
   },
 });
+
