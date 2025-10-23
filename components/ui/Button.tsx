@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, typography, borderRadius, spacing } from '@/constants/theme';
+import { colors, typography, borderRadius, spacing, gradients } from '@/constants/theme';
 
 interface ButtonProps {
   title: string;
@@ -24,8 +24,17 @@ export function Button({
   disabled = false,
   style,
   textStyle,
-  gradientColors,
+  gradientColors: customGradientColors,
 }: ButtonProps) {
+  const handlePress = useCallback(() => {
+    if (!disabled && !loading) {
+      onPress();
+    }
+  }, [onPress, disabled, loading]);
+
+  const isPrimary = variant === 'primary';
+  const currentGradientColors = customGradientColors || gradients.primary;
+
   const sizeStyles = {
     small: styles.small,
     medium: styles.medium,
@@ -38,50 +47,77 @@ export function Button({
     large: styles.textLarge,
   };
 
-  if (variant === 'primary' && !disabled) {
-    const colors = gradientColors || ['#2196F3', '#9C27B0'];
+  const variantStyles = StyleSheet.create({
+    primary: {
+      backgroundColor: isPrimary && !customGradientColors ? colors.primary.blue : undefined,
+    },
+    secondary: {
+      backgroundColor: colors.background.tertiary,
+    },
+    outline: {
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderColor: colors.primary.blue,
+    },
+    danger: {
+      backgroundColor: colors.status.error,
+    },
+  });
+
+  const textVariantStyles = StyleSheet.create({
+    primary: {
+      color: colors.text.primary,
+    },
+    secondary: {
+      color: colors.text.primary,
+    },
+    outline: {
+      color: colors.primary.blue,
+    },
+    danger: {
+      color: colors.text.primary,
+    },
+  });
+
+  const content = loading ? (
+    <ActivityIndicator color={isPrimary && !customGradientColors ? colors.text.primary : (variant === 'outline' ? colors.primary.blue : colors.text.primary)} />
+  ) : (
+    <Text
+      style={[
+        styles.text,
+        textSizeStyles[size],
+        textVariantStyles[variant],
+        disabled && styles.textDisabled,
+        textStyle,
+      ]}
+    >
+      {title}
+    </Text>
+  );
+
+  if (isPrimary && !disabled) {
     return (
       <TouchableOpacity
-        onPress={onPress}
+        onPress={handlePress}
         disabled={disabled || loading}
         style={[styles.container, sizeStyles[size], style]}
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={colors}
+          colors={currentGradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.gradient}
         >
-          {loading ? (
-            <ActivityIndicator color={colors.text.primary} />
-          ) : (
-            <Text style={[styles.text, textSizeStyles[size], textStyle]}>
-              {title}
-            </Text>
-          )}
+          {content}
         </LinearGradient>
       </TouchableOpacity>
     );
   }
 
-  const variantStyles = {
-    primary: styles.primary,
-    secondary: styles.secondary,
-    outline: styles.outline,
-    danger: styles.danger,
-  };
-
-  const textVariantStyles = {
-    primary: styles.textPrimary,
-    secondary: styles.textSecondary,
-    outline: styles.textOutline,
-    danger: styles.textDanger,
-  };
-
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={handlePress}
       disabled={disabled || loading}
       style={[
         styles.container,
@@ -92,21 +128,7 @@ export function Button({
       ]}
       activeOpacity={0.8}
     >
-      {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? colors.primary.blue : colors.text.primary} />
-      ) : (
-        <Text
-          style={[
-            styles.text,
-            textSizeStyles[size],
-            textVariantStyles[variant],
-            disabled && styles.textDisabled,
-            textStyle,
-          ]}
-        >
-          {title}
-        </Text>
-      )}
+      {content}
     </TouchableOpacity>
   );
 }
@@ -121,6 +143,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    flex: 1, // Ensure gradient fills the touchable area
   },
   small: {
     paddingVertical: spacing.sm,
@@ -133,20 +156,6 @@ const styles = StyleSheet.create({
   large: {
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.xl,
-  },
-  primary: {
-    backgroundColor: colors.primary.blue,
-  },
-  secondary: {
-    backgroundColor: colors.background.tertiary,
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: colors.primary.blue,
-  },
-  danger: {
-    backgroundColor: colors.status.error,
   },
   disabled: {
     opacity: 0.5,
@@ -165,19 +174,8 @@ const styles = StyleSheet.create({
   textLarge: {
     fontSize: 18,
   },
-  textPrimary: {
-    color: colors.text.primary,
-  },
-  textSecondary: {
-    color: colors.text.primary,
-  },
-  textOutline: {
-    color: colors.primary.blue,
-  },
-  textDanger: {
-    color: colors.text.primary,
-  },
   textDisabled: {
     color: colors.text.disabled,
   },
 });
+
