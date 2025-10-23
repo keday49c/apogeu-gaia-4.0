@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { AuthUser } from '../types';
 import { authService } from './service';
 
@@ -12,6 +11,7 @@ interface AuthContextState {
 
 interface AuthContextActions {
   setOperationLoading: (loading: boolean) => void;
+  // Add other actions here if needed, e.g., login, logout, register
 }
 
 type AuthContextType = AuthContextState & AuthContextActions;
@@ -30,23 +30,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initialized: false,
   });
 
-  const updateState = (updates: Partial<AuthContextState>) => {
+  const updateState = useCallback((updates: Partial<AuthContextState>) => {
     setState(prevState => {
       const newState = { ...prevState, ...updates };
       return newState;
     });
-  };
+  }, []);
 
-  const setOperationLoading = (loading: boolean) => {
+  const setOperationLoading = useCallback((loading: boolean) => {
     updateState({ operationLoading: loading });
-  };
+  }, [updateState]);
 
   useEffect(() => {
     let isMounted = true;
-    let authSubscription: any = null;
+    let authSubscription: { unsubscribe: () => void } | null = null;
 
     const initializeAuth = async () => {
-      
       try {
         const currentUser = await authService.getCurrentUser();
         
@@ -84,11 +83,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         authSubscription.unsubscribe();
       }
     };
-  }, []); // Empty dependency array ensures single execution
-  const contextValue: AuthContextType = {
+  }, [updateState]); // Added updateState to dependency array
+
+  const contextValue = useMemo(() => ({
     ...state,
     setOperationLoading,
-  };
+  }), [state, setOperationLoading]);
 
   return (
     <AuthContext.Provider value={contextValue}>
