@@ -1,7 +1,7 @@
-// @ts-nocheck
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Platform, Alert } from 'react-native';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { Platform, Alert, Modal, View, Text, TouchableOpacity, StyleSheet, TextStyle, ViewStyle } from 'react-native';
 import { AlertButton, AlertState } from './types';
+import { colors, typography, spacing } from '@/constants/theme';
 
 // Context type definition
 interface AlertContextType {
@@ -24,59 +24,57 @@ export function AlertProvider({ children }: AlertProviderProps) {
     buttons: []
   });
 
-  const showAlert = (
-    title: string,
-    message?: string,
-    buttons?: AlertButton[]
-  ) => {
-    // Parameter normalization
-    const normalizedMessage = message || '';
-    const normalizedButtons = buttons?.length ? buttons : [{ 
-      text: 'OK',
-      onPress: () => {}
-    }];
+  const showAlert = useCallback(
+    (
+      title: string,
+      message?: string,
+      buttons?: AlertButton[]
+    ) => {
+      const normalizedMessage = message || '';
+      const normalizedButtons = buttons?.length ? buttons : [{ 
+        text: 'OK',
+        onPress: () => {}
+      }];
 
-    if (Platform.OS === 'web') {
-      // Web: Use internal modal
-      setAlertState({
-        visible: true,
-        title,
-        message: normalizedMessage,
-        buttons: normalizedButtons
-      });
-    } else {
-      // Mobile: Use native Alert.alert
-      const alertButtons = normalizedButtons.map(button => ({
-        text: button.text,
-        onPress: button.onPress,
-        style: button.style
-      }));
-      
-      Alert.alert(title, normalizedMessage, alertButtons);
-    }
-  };
+      if (Platform.OS === 'web') {
+        setAlertState({
+          visible: true,
+          title,
+          message: normalizedMessage,
+          buttons: normalizedButtons
+        });
+      } else {
+        const alertButtons = normalizedButtons.map(button => ({
+          text: button.text,
+          onPress: button.onPress,
+          style: button.style
+        }));
+        
+        Alert.alert(title, normalizedMessage, alertButtons);
+      }
+    },
+    []
+  );
 
-  const hideAlert = () => {
+  const hideAlert = useCallback(() => {
     setAlertState(prev => ({ ...prev, visible: false }));
-  };
+  }, []);
 
-  const handleButtonPress = (button: AlertButton) => {
+  const handleButtonPress = useCallback((button: AlertButton) => {
     try {
-      
       if (typeof button.onPress === 'function') {
         button.onPress();
       }
-      
       hideAlert();
     } catch (error) {
       console.warn('[Template:AlertProvider] Button press error:', error);
       hideAlert();
     }
-  };
+  }, [hideAlert]);
 
-  const contextValue: AlertContextType = {
+  const contextValue = React.useMemo(() => ({
     showAlert
-  };
+  }), [showAlert]);
 
   return (
     <AlertContext.Provider value={contextValue}>
@@ -92,7 +90,6 @@ export function AlertProvider({ children }: AlertProviderProps) {
   );
 }
 
-// useAlertContext Hook - internal use
 export function useAlertContext(): AlertContextType {
   const context = useContext(AlertContext);
   
@@ -102,15 +99,6 @@ export function useAlertContext(): AlertContextType {
   
   return context;
 }
-
-// Internal Web Alert Modal Component
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
 
 interface WebAlertModalProps {
   alertState: AlertState;
@@ -123,20 +111,18 @@ function WebAlertModal({ alertState, onButtonPress, onHide }: WebAlertModalProps
     return null;
   }
 
-  // Determine button style
-  const getButtonStyle = (button: AlertButton, index: number) => {
+  const getButtonStyle = useCallback((button: AlertButton, index: number): ViewStyle[] => {
     const isLast = index === alertState.buttons.length - 1;
-    const baseStyle = [styles.button];
+    const baseStyle: ViewStyle[] = [styles.button];
     
     if (alertState.buttons.length > 1 && !isLast) {
       baseStyle.push(styles.buttonWithBorder);
     }
     
     return baseStyle;
-  };
+  }, [alertState.buttons]);
 
-  // Determine button text style
-  const getButtonTextStyle = (button: AlertButton) => {
+  const getButtonTextStyle = useCallback((button: AlertButton): TextStyle => {
     switch (button.style) {
       case 'cancel':
         return styles.cancelButtonText;
@@ -145,10 +131,10 @@ function WebAlertModal({ alertState, onButtonPress, onHide }: WebAlertModalProps
       default:
         return styles.defaultButtonText;
     }
-  };
+  }, []);
 
   return (
-    <Modal visible={alertState.visible} transparent animationType="fade">
+    <Modal visible={alertState.visible} transparent animationType="fade" onRequestClose={onHide}>
       <View style={styles.overlay}>
         <View style={styles.container}>
           <View style={styles.content}>
@@ -160,7 +146,6 @@ function WebAlertModal({ alertState, onButtonPress, onHide }: WebAlertModalProps
           
           <View style={styles.buttonContainer}>
             {alertState.buttons.length === 1 ? (
-              // Single button layout
               <TouchableOpacity 
                 style={[styles.button, styles.singleButton]}
                 onPress={() => onButtonPress(alertState.buttons[0])}
@@ -171,7 +156,6 @@ function WebAlertModal({ alertState, onButtonPress, onHide }: WebAlertModalProps
                 </Text>
               </TouchableOpacity>
             ) : (
-              // Multiple button layout (horizontal)
               <View style={styles.multiButtonContainer}>
                 {alertState.buttons.map((button, index) => (
                   <TouchableOpacity
@@ -200,17 +184,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.lg,
   },
   container: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background.primary,
     borderRadius: Platform.OS === 'ios' ? 14 : 12,
     minWidth: 280,
     maxWidth: 420,
-    // iOS style shadow
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.shadow.dark,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.15,
         shadowRadius: 20,
@@ -221,34 +204,31 @@ const styles = StyleSheet.create({
     }),
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
   title: {
-    fontSize: 17,
-    fontWeight: Platform.OS === 'ios' ? '600' : '500',
-    color: '#1D1D1F',
-    marginBottom: 8,
+    ...typography.h3,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
     textAlign: 'center',
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
   },
   message: {
-    fontSize: 15,
-    color: '#86868B',
+    ...typography.body,
+    color: colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 20,
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
+    lineHeight: typography.body.lineHeight,
   },
   buttonContainer: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#D1D1D6',
+    borderTopColor: colors.border.light,
   },
   multiButtonContainer: {
     flexDirection: 'row',
   },
   button: {
-    paddingVertical: 17,
+    paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 56,
@@ -261,24 +241,20 @@ const styles = StyleSheet.create({
   },
   buttonWithBorder: {
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: '#D1D1D6',
+    borderRightColor: colors.border.light,
   },
   defaultButtonText: {
-    color: '#007AFF',
-    fontSize: 17,
-    fontWeight: Platform.OS === 'ios' ? '600' : '500',
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
+    ...typography.button,
+    color: colors.action.primary,
   },
   cancelButtonText: {
-    color: '#007AFF',
-    fontSize: 17,
+    ...typography.button,
+    color: colors.action.primary,
     fontWeight: Platform.OS === 'ios' ? '400' : '400',
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
   },
   destructiveButtonText: {
-    color: '#FF3B30',
-    fontSize: 17,
-    fontWeight: Platform.OS === 'ios' ? '600' : '500',
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
+    ...typography.button,
+    color: colors.action.danger,
   },
 });
+
