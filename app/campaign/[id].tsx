@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { campaignService, Campaign } from '@/services/campaignService';
@@ -18,32 +18,67 @@ export default function CampaignDetailScreen() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [analytics, setAnalytics] = useState<CampaignAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadCampaignData = useCallback(async () => {
+    if (typeof id !== 'string') {
+      setError('ID da campanha inválido.');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data: campaignData, error: campaignError } = await campaignService.getById(id);
+      if (campaignError) {
+        setError(`Erro ao carregar campanha: ${campaignError}`);
+        showAlert('Erro', `Erro ao carregar campanha: ${campaignError}`);
+        setCampaign(null);
+        setAnalytics([]);
+        return;
+      }
+      if (campaignData) {
+        setCampaign(campaignData);
+      } else {
+        setError('Campanha não encontrada.');
+        showAlert('Erro', 'Campanha não encontrada.');
+        setCampaign(null);
+        setAnalytics([]);
+        return;
+      }
+
+      const { data: analyticsData, error: analyticsError } = await analyticsService.getByCampaign(id);
+      if (analyticsError) {
+        showAlert('Erro', `Erro ao carregar análises: ${analyticsError}`);
+        setAnalytics([]);
+      } else if (analyticsData && analyticsData.length === 0) {
+        // If no analytics data, generate mock data
+        const { error: mockError } = await analyticsService.createMockData(id);
+        if (mockError) {
+          showAlert('Erro', `Erro ao gerar dados simulados: ${mockError}`);
+        } else {
+          const { data: newAnalyticsData } = await analyticsService.getByCampaign(id);
+          setAnalytics(newAnalyticsData || []);
+        }
+      } else {
+        setAnalytics(analyticsData || []);
+      }
+    } catch (err) {
+      console.error('Erro inesperado ao carregar dados da campanha:', err);
+      setError('Ocorreu um erro inesperado ao carregar os dados da campanha.');
+      showAlert('Erro', 'Ocorreu um erro inesperado ao carregar os dados da campanha.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, showAlert]);
 
   useEffect(() => {
     loadCampaignData();
-  }, [id]);
+  }, [loadCampaignData]);
 
-  const loadCampaignData = async () => {
-    if (typeof id !== 'string') return;
-
-    const { data: campaignData } = await campaignService.getById(id);
-    if (campaignData) {
-      setCampaign(campaignData);
-    }
-
-    const { data: analyticsData } = await analyticsService.getByCampaign(id);
-    if (analyticsData && analyticsData.length === 0) {
-      await analyticsService.createMockData(id);
-      const { data: newAnalyticsData } = await analyticsService.getByCampaign(id);
-      setAnalytics(newAnalyticsData || []);
-    } else {
-      setAnalytics(analyticsData || []);
-    }
-
-    setLoading(false);
-  };
-
-  const handleGenerateData = async () => {
+  const handleGenerateData = useCallback(async () => {
     if (typeof id !== 'string') return;
 
     showAlert('Gerar Dados', 'Deseja gerar dados de análise simulados para esta campanha?', [
@@ -51,9 +86,9 @@ export default function CampaignDetailScreen() {
       {
         text: 'Gerar',
         onPress: async () => {
-          const { error } = await analyticsService.createMockData(id);
-          if (error) {
-            showAlert('Erro', error);
+          const { error: mockError } = await analyticsService.createMockData(id);
+          if (mockError) {
+            showAlert('Erro', mockError);
           } else {
             showAlert('Sucesso', 'Dados de análise gerados com sucesso!');
             loadCampaignData();
@@ -61,13 +96,29 @@ export default function CampaignDetailScreen() {
         },
       },
     ]);
-  };
+  }, [id, loadCampaignData, showAlert]);
 
-  if (loading || !campaign) {
+  if (loading) {
     return (
       <ScreenContainer>
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary.blue} />
           <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (error || !campaign) {
+    return (
+      <ScreenContainer>
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={80} color={colors.error} />
+          <Text style={styles.errorTitle}>Erro ao carregar campanha</Text>
+          <Text style={styles.errorText}>{error || 'Não foi possível carregar os detalhes da campanha.'}</Text>
+          <TouchableOpacity style={styles.errorButton} onPress={loadCampaignData}>
+            <Text style={styles.errorButtonText}>Tentar Novamente</Text>
+          </TouchableOpacity>
         </View>
       </ScreenContainer>
     );
@@ -169,7 +220,7 @@ export default function CampaignDetailScreen() {
 
                 <View style={styles.metricBox}>
                   <Text style={styles.metricValue}>{totalClicks.toLocaleString('pt-BR')}</Text>
-                  <Text style={styles.metricLabel}>Cliques</Text>
+                  <Text style={styles.metricLabel}>Cliques</n>
                 </View>
 
                 <View style={styles.metricBox}>
@@ -224,10 +275,42 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.xxl,
   },
   loadingText: {
     ...typography.body,
     color: colors.text.secondary,
+    marginTop: spacing.md,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xxl,
+  },
+  errorTitle: {
+    ...typography.h3,
+    color: colors.error,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  errorButton: {
+    backgroundColor: colors.primary.blue,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    marginTop: spacing.md,
+  },
+  errorButtonText: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '600',
   },
   headerCard: {
     marginBottom: spacing.md,
@@ -325,3 +408,4 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
 });
+
