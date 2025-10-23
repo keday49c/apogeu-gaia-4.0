@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, borderRadius, spacing } from '@/constants/theme';
+import { colors, borderRadius, spacing, gradients } from '@/constants/theme';
 
 interface GradientCardProps {
   children: React.ReactNode;
@@ -10,20 +10,18 @@ interface GradientCardProps {
 }
 
 export function GradientCard({ children, gradientColors, style }: GradientCardProps) {
-  if (gradientColors) {
-    return (
-      <LinearGradient
-        colors={gradientColors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.card, style]}
-      >
-        {children}
-      </LinearGradient>
-    );
-  }
+  const currentGradientColors = gradientColors || gradients.default; // Use a default gradient if none provided
 
-  return <View style={[styles.card, styles.solidCard, style]}>{children}</View>;
+  return (
+    <LinearGradient
+      colors={currentGradientColors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.card, style]}
+    >
+      {children}
+    </LinearGradient>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -31,7 +29,5 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
   },
-  solidCard: {
-    backgroundColor: colors.background.card,
-  },
 });
+
