@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Supabase configuration
 export interface SupabaseConfig {
   url: string;
@@ -23,16 +22,12 @@ export interface StorageConfig {
   defaultBucket?: string;
 }
 
-// Module configuration union type
-export interface ModuleConfig {
-  auth?: AuthConfig | false;
-  payments?: PaymentsConfig | false;
-  storage?: StorageConfig | false;
-}
-
 // Main configuration interface
-export interface OnSpaceConfig extends ModuleConfig {
-  supabase: SupabaseConfig;
+export interface OnSpaceConfig {
+  supabase?: SupabaseConfig;
+  auth: AuthConfig | false;
+  payments: PaymentsConfig | false;
+  storage: StorageConfig | false;
 }
 
 // Runtime state
@@ -49,3 +44,4 @@ export interface OnSpaceError {
   module?: string;
   details?: any;
 }
+
