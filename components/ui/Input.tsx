@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
-import { View, TextInput, Text, StyleSheet, TextInputProps } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, TextInput, Text, StyleSheet, TextInputProps, StyleProp } from 'react-native';
 import { colors, typography, borderRadius, spacing } from '@/constants/theme';
 
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
   helperText?: string;
+  style?: StyleProp<TextInputProps['style']>;
 }
 
 export function Input({ label, error, helperText, style, ...props }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
+
+  const handleFocus = useCallback(() => setIsFocused(true), []);
+  const handleBlur = useCallback(() => setIsFocused(false), []);
 
   return (
     <View style={styles.container}>
@@ -22,8 +26,8 @@ export function Input({ label, error, helperText, style, ...props }: InputProps)
           style,
         ]}
         placeholderTextColor={colors.text.tertiary}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         {...props}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -68,3 +72,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 });
+
