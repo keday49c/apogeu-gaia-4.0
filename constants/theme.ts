@@ -44,6 +44,7 @@ export const colors = {
 };
 
 export const gradients = {
+  default: ['#1E2139', '#1A1F3A'], // Added a default gradient for GradientCard
   primary: ['#2196F3', '#9C27B0'],
   secondary: ['#00BCD4', '#E91E63'],
   success: ['#4CAF50', '#2196F3'],
@@ -130,5 +131,44 @@ export const shadows = {
     shadowOpacity: 0.2,
     shadowRadius: 16,
     elevation: 8,
+  },
+};
+
+// Common styles for consistent UI elements
+export const commonStyles = {
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+  card: {
+    backgroundColor: colors.background.card,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+  },
+  cardWithShadow: {
+    backgroundColor: colors.background.card,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  spaceBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  flex1: {
+    flex: 1,
   },
 };
