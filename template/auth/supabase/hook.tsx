@@ -1,14 +1,13 @@
-// @ts-nocheck
-
 import { AuthContextType, SendOTPResult, AuthResult, LogoutResult, SignUpResult } from '../types';
 import { authService } from './service';
 import { configManager } from '../../core/config';
 import { useAuthContext } from './context';
+import { useCallback } from 'react';
 
 export function useAuth(): AuthContextType {
   const context = useAuthContext();
   
-  const isAuthEnabled = configManager.isModuleEnabled('auth');
+  const isAuthEnabled = configManager.isModuleEnabled("auth");
   if (!isAuthEnabled) {
     return {
       user: null,
@@ -16,97 +15,97 @@ export function useAuth(): AuthContextType {
       operationLoading: false,
       initialized: true,
       setOperationLoading: () => {},
-      sendOTP: async (): Promise<SendOTPResult> => ({ 
-        error: 'Auth function not enabled, please check configuration' 
+      sendOTP: async (): Promise<SendOTPResult> => ({
+        error: "Auth function not enabled, please check configuration",
       }),
-      verifyOTPAndLogin: async (): Promise<AuthResult> => ({ 
-        error: 'Auth function not enabled, please check configuration', 
-        user: null 
+      verifyOTPAndLogin: async (): Promise<AuthResult> => ({
+        error: "Auth function not enabled, please check configuration",
+        user: null,
       }),
-      signUpWithPassword: async (): Promise<SignUpResult> => ({ 
-        error: 'Auth function not enabled, please check configuration', 
-        user: null 
+      signUpWithPassword: async (): Promise<SignUpResult> => ({
+        error: "Auth function not enabled, please check configuration",
+        user: null,
       }),
-      signInWithPassword: async (): Promise<AuthResult> => ({ 
-        error: 'Auth function not enabled, please check configuration', 
-        user: null 
+      signInWithPassword: async (): Promise<AuthResult> => ({
+        error: "Auth function not enabled, please check configuration",
+        user: null,
       }),
       logout: async (): Promise<LogoutResult> => {
-        console.warn('Auth function not enabled');
-        return { 
-          error: 'Auth function not enabled, please check configuration' 
+        console.warn("Auth function not enabled");
+        return {
+          error: "Auth function not enabled, please check configuration",
         };
       },
       refreshSession: async () => {
-        console.warn('Auth function not enabled');
+        console.warn("Auth function not enabled");
       },
     };
   }
 
-  const sendOTP = async (email: string): Promise<SendOTPResult> => {
+  const sendOTP = useCallback(async (email: string): Promise<SendOTPResult> => {
     context.setOperationLoading(true);
     try {
       const result = await authService.sendOTP(email);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[Template:useAuth] sendOTP exception:', error);
       return { 
-        error: 'Failed to send verification code' 
+        error: error.message || 'Failed to send verification code' 
       };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-    const verifyOTPAndLogin = async (email: string, otp: string, options?: { password?: string }): Promise<AuthResult> => {
+  const verifyOTPAndLogin = useCallback(async (email: string, otp: string, options?: { password?: string }): Promise<AuthResult> => {
     context.setOperationLoading(true);
     try {
       const result = await authService.verifyOTPAndLogin(email, otp, options);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[Template:useAuth] verifyOTPAndLogin exception:', error);
       return { 
-        error: 'Login failed',
+        error: error.message || 'Login failed',
         user: null 
       };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-  const signUpWithPassword = async (email: string, password: string, metadata?: Record<string, any>): Promise<SignUpResult> => {
+  const signUpWithPassword = useCallback(async (email: string, password: string, metadata?: Record<string, any>): Promise<SignUpResult> => {
     context.setOperationLoading(true);
     try {
       const result = await authService.signUpWithPassword(email, password, metadata);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[Template:useAuth] signUpWithPassword exception:', error);
       return { 
-        error: 'Registration failed',
+        error: error.message || 'Registration failed',
         user: null 
       };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-  const signInWithPassword = async (email: string, password: string): Promise<AuthResult> => {
+  const signInWithPassword = useCallback(async (email: string, password: string): Promise<AuthResult> => {
     context.setOperationLoading(true);
     try {
       const result = await authService.signInWithPassword(email, password);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[Template:useAuth] signInWithPassword exception:', error);
       return { 
-        error: 'Login failed',
+        error: error.message || 'Login failed',
         user: null 
       };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-  const logout = async (): Promise<LogoutResult> => {
+  const logout = useCallback(async (): Promise<LogoutResult> => {
     context.setOperationLoading(true);
     try {
       const result = await authService.logout();
@@ -117,22 +116,22 @@ export function useAuth(): AuthContextType {
       }
       
       return result;
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown logout error';
       console.warn('[Template:useAuth] Logout hook exception:', errorMessage);
       return { error: errorMessage };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     try {
       await authService.refreshSession();
     } catch (error) {
       console.warn('[Template:useAuth] Refresh session error:', error);
     }
-  };
+  }, []);
 
   return {
     user: context.user,
