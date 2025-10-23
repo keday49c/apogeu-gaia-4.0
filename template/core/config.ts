@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { OnSpaceConfig } from './types';
+import { OnSpaceConfig, SupabaseConfig } from './types';
 
 class ConfigManager {
   private static instance: ConfigManager;
@@ -33,11 +32,11 @@ class ConfigManager {
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-    let authConfig;
-    let supabaseConfig;
+    let authConfig: OnSpaceConfig["auth"];
+    let supabaseConfig: SupabaseConfig | undefined;
 
     if (!supabaseUrl || !supabaseAnonKey) {
-          console.warn('[Template:Config] Supabase environment variables missing, automatically disabling auth module');
+      console.warn('[Template:Config] Supabase environment variables missing, automatically disabling auth module');
       authConfig = false;
     } else {
       authConfig = {
@@ -58,17 +57,17 @@ class ConfigManager {
     };
   }
 
-  public getModuleConfig<T = any>(moduleName: string): T | null {
+  public getModuleConfig<T = any>(moduleName: keyof OnSpaceConfig): T | null {
     const config = this.getConfig();
-    return (config as any)[moduleName] || null;
+    return (config[moduleName] as T) || null;
   }
 
-  public isModuleEnabled(moduleName: string): boolean {
+  public isModuleEnabled(moduleName: keyof OnSpaceConfig): boolean {
     const moduleConfig = this.getModuleConfig(moduleName);
     return moduleConfig !== false && moduleConfig !== null;
   }
 
-  public getSupabaseConfig() {
+  public getSupabaseConfig(): SupabaseConfig | undefined {
     return this.getConfig().supabase;
   }
 
@@ -92,7 +91,7 @@ interface CreateConfigOptions {
 }
 
 export const createConfig = (options: CreateConfigOptions = {}): OnSpaceConfig => {
-  let authConfig;
+  let authConfig: OnSpaceConfig["auth"];
   if (options.auth === false) {
     authConfig = false;
   } else if (options.auth === undefined) {
@@ -108,7 +107,7 @@ export const createConfig = (options: CreateConfigOptions = {}): OnSpaceConfig =
     };
   }
 
-  let supabaseConfig;
+  let supabaseConfig: SupabaseConfig | undefined;
   if (authConfig !== false) {
     const supabaseUrl = options.supabase?.url || process.env.EXPO_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = options.supabase?.anonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
