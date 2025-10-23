@@ -1,35 +1,76 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { analyticsService, AnalyticsSummary } from '@/services/analyticsService';
 import { ScreenContainer } from '@/components/layout/ScreenContainer';
 import { StatCard } from '@/components/ui/StatCard';
 import { GradientCard } from '@/components/ui/GradientCard';
 import { colors, typography, spacing, gradients } from '@/constants/theme';
+import { useAlert } from '@/template';
 
 export default function AnalyticsScreen() {
+  const { showAlert } = useAlert();
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     setLoading(true);
-    const { data } = await analyticsService.getSummary();
-    if (data) {
-      setSummary(data);
+    setError(null);
+    try {
+      const { data, error: serviceError } = await analyticsService.getSummary();
+      if (serviceError) {
+        setError(serviceError);
+        showAlert('Erro', `Erro ao carregar análises: ${serviceError}`);
+        setSummary(null);
+      } else if (data) {
+        setSummary(data);
+      }
+    } catch (err) {
+      console.error('Erro inesperado ao carregar análises:', err);
+      setError('Ocorreu um erro inesperado ao carregar as análises.');
+      showAlert('Erro', 'Ocorreu um erro inesperado ao carregar as análises.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [showAlert]);
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadAnalytics();
     setRefreshing(false);
-  };
+  }, [loadAnalytics]);
 
   useEffect(() => {
     loadAnalytics();
-  }, []);
+  }, [loadAnalytics]);
+
+  if (loading) {
+    return (
+      <ScreenContainer>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary.blue} />
+          <Text style={styles.loadingText}>Carregando análises...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <ScreenContainer>
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={80} color={colors.error} />
+          <Text style={styles.errorTitle}>Erro ao carregar análises</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.errorButton} onPress={onRefresh}>
+            <Text style={styles.errorButtonText}>Tentar Novamente</Text>
+          </TouchableOpacity>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
@@ -220,4 +261,45 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     lineHeight: 20,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xxl,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.text.secondary,
+    marginTop: spacing.md,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xxl,
+  },
+  errorTitle: {
+    ...typography.h3,
+    color: colors.error,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  errorButton: {
+    backgroundColor: colors.primary.blue,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+  },
+  errorButtonText: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
 });
+
