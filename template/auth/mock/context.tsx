@@ -1,9 +1,7 @@
-// @ts-nocheck
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { AuthUser } from '../types';
 import { mockAuthService } from './service';
 
-// Context type definition - consistent with Supabase Auth
 interface MockAuthContextState {
   user: AuthUser | null;
   loading: boolean;
@@ -17,10 +15,8 @@ interface MockAuthContextActions {
 
 type MockAuthContextType = MockAuthContextState & MockAuthContextActions;
 
-// Create Context
 const MockAuthContext = createContext<MockAuthContextType | undefined>(undefined);
 
-// MockAuthProvider - clean design
 interface MockAuthProviderProps {
   children: ReactNode;
 }
@@ -33,27 +29,23 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
     initialized: false,
   });
 
-    // Unified state update function
-  const updateState = (updates: Partial<MockAuthContextState>) => {
-    setState(prevState => {
-      const newState = { ...prevState, ...updates };
-      return newState;
-    });
-  };
+  const updateState = useCallback((updates: Partial<MockAuthContextState>) => {
+    setState(prevState => ({
+      ...prevState,
+      ...updates,
+    }));
+  }, []);
 
-  // Set operation loading state
-  const setOperationLoading = (loading: boolean) => {
+  const setOperationLoading = useCallback((loading: boolean) => {
     updateState({ operationLoading: loading });
-  };
+  }, [updateState]);
 
-  // Initialize Mock auth system - execute only once
   useEffect(() => {
     let isMounted = true;
-    let authSubscription: any = null;
+    let authSubscription: { unsubscribe: () => void } | null = null;
 
     const initializeMockAuth = async () => {      
       try {
-        // 1. Get current user state
         const currentUser = await mockAuthService.getCurrentUser();
         
         if (isMounted) {
@@ -64,7 +56,6 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
           });
         }
 
-        // 2. Set up auth state listener
         authSubscription = mockAuthService.onAuthStateChange((authUser) => {
           if (isMounted) {
             updateState({ user: authUser });
@@ -85,20 +76,18 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
 
     initializeMockAuth();
 
-    // Cleanup function
     return () => {
       isMounted = false;
       if (authSubscription?.unsubscribe) {
         authSubscription.unsubscribe();
       }
     };
-  }, []); // Empty dependency array ensures single execution
+  }, [updateState]);
 
-  // Context value
-  const contextValue: MockAuthContextType = {
+  const contextValue = useMemo(() => ({
     ...state,
     setOperationLoading,
-  };
+  }), [state, setOperationLoading]);
 
   return (
     <MockAuthContext.Provider value={contextValue}>
@@ -107,7 +96,6 @@ export function MockAuthProvider({ children }: MockAuthProviderProps) {
   );
 }
 
-// useMockAuthContext Hook - internal use
 export function useMockAuthContext(): MockAuthContextType {
   const context = useContext(MockAuthContext);
   
