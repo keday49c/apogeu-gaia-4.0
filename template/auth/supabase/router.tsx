@@ -1,12 +1,13 @@
-// @ts-nocheck
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useAuth } from './hook';
+import { colors, typography, spacing } from '@/constants/theme';
 
 const DefaultLoadingScreen = () => (
   <View style={styles.defaultContainer}>
-    <Text style={styles.defaultText}>Loading...</Text>
+    <ActivityIndicator size="large" color={colors.primary.blue} />
+    <Text style={styles.defaultText}>Carregando...</Text>
   </View>
 );
 
@@ -27,39 +28,33 @@ export function AuthRouter({
   const router = useRouter();
   const pathname = usePathname();
 
+  const isLoginRoute = useMemo(() => pathname === loginRoute, [pathname, loginRoute]);
+  const isExcludedRoute = useMemo(() => 
+    excludeRoutes.some(route => pathname.startsWith(route)), 
+    [pathname, excludeRoutes]
+  );
+
   useEffect(() => {
     if (!initialized || loading) {
       return;
     }
 
-    const isLoginRoute = pathname === loginRoute;
-    const isExcludedRoute = excludeRoutes.some(route => 
-      pathname.startsWith(route)
-    );
-
-    const action = !user && !isLoginRoute && !isExcludedRoute ? 'redirect_to_login' :
-                   user && isLoginRoute ? 'redirect_to_home' : 'no_action';
-
-    if (action === 'redirect_to_login') {
+    if (!user && !isLoginRoute && !isExcludedRoute) {
       router.push(loginRoute);
-    } else if (action === 'redirect_to_home') {
+    } else if (user && isLoginRoute) {
       router.replace('/');
     }
-  }, [user?.id, loading, initialized, pathname, loginRoute, excludeRoutes, router]);
+  }, [user, loading, initialized, isLoginRoute, isExcludedRoute, loginRoute, router]);
 
   if (loading || !initialized) {
     return <LoadingComponent />;
   }
 
-  const isLoginRoute = pathname === loginRoute;
-  const isExcludedRoute = excludeRoutes.some(route => 
-    pathname.startsWith(route)
-  );
-  
   if (isLoginRoute || isExcludedRoute || user) {
     return <>{children}</>;
   }
 
+  // Fallback in case of unhandled state, though useEffect should handle most cases
   return <LoadingComponent />;
 }
 
@@ -68,10 +63,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.background.primary,
   },
   defaultText: {
-    fontSize: 18,
-    color: '#6B7280',
+    ...typography.body,
+    color: colors.text.secondary,
+    marginTop: spacing.md,
   },
 });
+
