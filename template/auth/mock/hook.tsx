@@ -1,77 +1,75 @@
-// @ts-nocheck
 import { AuthContextType, SendOTPResult, AuthResult, LogoutResult, SignUpResult } from '../types';
 import { mockAuthService } from './service';
 import { useMockAuthContext } from './context';
-import { useState, useEffect } from 'react';
-
+import { useState, useEffect, useCallback } from 'react';
 
 export function useMockAuth(): AuthContextType {
   const context = useMockAuthContext();
   
-        const sendOTP = async (email: string): Promise<SendOTPResult> => {
+  const sendOTP = useCallback(async (email: string): Promise<SendOTPResult> => {
     context.setOperationLoading(true);
     try {
       const result = await mockAuthService.sendOTP(email);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[Template:useMockAuth] sendOTP exception:', error);
       return { 
-        error: 'Failed to send verification code' 
+        error: error.message || 'Failed to send verification code' 
       };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-    const verifyOTPAndLogin = async (email: string, otp: string, options?: { password?: string }): Promise<AuthResult> => {
+  const verifyOTPAndLogin = useCallback(async (email: string, otp: string, options?: { password?: string }): Promise<AuthResult> => {
     context.setOperationLoading(true);
     try {
       const result = await mockAuthService.verifyOTPAndLogin(email, otp, options);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[Template:useMockAuth] verifyOTPAndLogin exception:', error);
       return { 
-        error: 'Login failed',
+        error: error.message || 'Login failed',
         user: null 
       };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-  const signUpWithPassword = async (email: string, password: string, metadata?: Record<string, any>): Promise<SignUpResult> => {
+  const signUpWithPassword = useCallback(async (email: string, password: string, metadata?: Record<string, any>): Promise<SignUpResult> => {
     context.setOperationLoading(true);
     try {
       const result = await mockAuthService.signUpWithPassword(email, password, metadata || {});
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[Template:useMockAuth] signUpWithPassword exception:', error);
       return { 
-        error: 'Registration failed',
+        error: error.message || 'Registration failed',
         user: null 
       };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-  const signInWithPassword = async (email: string, password: string): Promise<AuthResult> => {
+  const signInWithPassword = useCallback(async (email: string, password: string): Promise<AuthResult> => {
     context.setOperationLoading(true);
     try {
       const result = await mockAuthService.signInWithPassword(email, password);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.warn('[Template:useMockAuth] signInWithPassword exception:', error);
       return { 
-        error: 'Login failed',
+        error: error.message || 'Login failed',
         user: null 
       };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-  const logout = async (): Promise<LogoutResult> => {
+  const logout = useCallback(async (): Promise<LogoutResult> => {
     context.setOperationLoading(true);
     try {
       const result = await mockAuthService.logout();
@@ -82,22 +80,22 @@ export function useMockAuth(): AuthContextType {
       }
       
       return result;
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown logout error';
       console.warn('[Template:useMockAuth] Logout hook exception:', errorMessage);
       return { error: errorMessage };
     } finally {
       context.setOperationLoading(false);
     }
-  };
+  }, [context]);
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     try {
       await mockAuthService.refreshSession();
     } catch (error) {
       console.warn('[Template:useMockAuth] Refresh session error:', error);
     }
-  };
+  }, []);
 
   return {
     user: context.user,
@@ -118,19 +116,19 @@ export function useMockAuth(): AuthContextType {
 export function useMockAuthDebug() {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   
-  const refreshDebugInfo = async () => {
+  const refreshDebugInfo = useCallback(async () => {
     const info = await mockAuthService.getMockDebugInfo();
     setDebugInfo(info);
-  };
+  }, []);
   
-  const clearAllData = async () => {
+  const clearAllData = useCallback(async () => {
     await mockAuthService.clearAllMockData();
     await refreshDebugInfo();
-  };
+  }, [refreshDebugInfo]);
   
   useEffect(() => {
     refreshDebugInfo();
-  }, []);
+  }, [refreshDebugInfo]);
   
   return {
     debugInfo,
